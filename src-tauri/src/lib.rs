@@ -1,5 +1,5 @@
-mod pmset;
 mod audio;
+mod pmset;
 
 use audio::AlarmPlayer;
 use chrono::DateTime;
@@ -15,7 +15,7 @@ fn schedule_alarm(iso_time: String) -> Result<(), String> {
     let time = DateTime::parse_from_rfc3339(&iso_time)
         .map_err(|e| e.to_string())?
         .with_timezone(&chrono::Local);
-    
+
     pmset::schedule_wake(time).map_err(|e| e.to_string())
 }
 

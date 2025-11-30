@@ -1,5 +1,5 @@
-use std::process::Command;
 use chrono::{DateTime, Local};
+use std::process::Command;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PmsetError {
@@ -9,20 +9,22 @@ pub enum PmsetError {
     CommandFailed(String),
 }
 
+/// Helper to build the pmset command arguments.
+/// Exposed for testing purposes.
+fn build_wake_args(time: &DateTime<Local>) -> Vec<String> {
+    let time_str = time.format("%m/%d/%Y %H:%M:%S").to_string();
+    vec!["repeat".to_string(), "wakeorpoweron".to_string(), time_str]
+}
+
 /// Schedules a system wake event.
 /// Note: This command requires root privileges.
 pub fn schedule_wake(time: DateTime<Local>) -> Result<(), PmsetError> {
-    // Format time as "MM/dd/yyyy HH:mm:ss" for pmset
-    let time_str = time.format("%m/%d/%Y %H:%M:%S").to_string();
+    let args = build_wake_args(&time);
 
     // Command: sudo pmset repeat wakeorpoweron "MM/dd/yyyy HH:mm:ss"
-    // In a real GUI app, you'd use a privileged helper or AppleScript to prompt for auth.
-    // For this snippet, we assume the process has rights or we use a sudo prompt wrapper.
     let output = Command::new("sudo")
         .arg("pmset")
-        .arg("repeat")
-        .arg("wakeorpoweron")
-        .arg(&time_str)
+        .args(&args)
         .output()
         .map_err(PmsetError::ExecutionFailed)?;
 
@@ -49,4 +51,22 @@ pub fn clear_schedule() -> Result<(), PmsetError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_build_wake_args() {
+        // Create a fixed time: Oct 27, 2023 10:00:00
+        let time = Local.with_ymd_and_hms(2023, 10, 27, 10, 0, 0).unwrap();
+        let args = build_wake_args(&time);
+
+        assert_eq!(args.len(), 3);
+        assert_eq!(args[0], "repeat");
+        assert_eq!(args[1], "wakeorpoweron");
+        assert_eq!(args[2], "10/27/2023 10:00:00");
+    }
 }
