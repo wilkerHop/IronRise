@@ -27,12 +27,16 @@ if [ -d "${APP_DIR}" ]; then
 fi
 
 # 4. Optional: Clear pmset schedule
-echo "❓ Do you want to clear any scheduled wake events? (Requires Admin Password)"
-read -p "   Run 'sudo pmset repeat cancel'? [y/N] " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    sudo pmset repeat cancel
-    echo "   Schedule cleared."
+if [ "$1" == "--no-prompt" ] || [ -n "$CI" ]; then
+    echo "⏩ Skipping pmset clear (CI/Non-interactive mode)."
+else
+    echo "❓ Do you want to clear any scheduled wake events? (Requires Admin Password)"
+    read -p "   Run 'sudo pmset repeat cancel'? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        sudo pmset repeat cancel
+        echo "   Schedule cleared."
+    fi
 fi
 
 echo "✅ Uninstallation Complete."

@@ -36,3 +36,24 @@ jobs:
 
     - name: Run Health Check
       run: ./scripts/check_health.sh
+
+    - name: Verify Install/Uninstall
+      if: runner.os == 'macOS'
+      run: |
+        chmod +x install.sh uninstall.sh
+        echo "📦 Testing Installation..."
+        ./install.sh
+        
+        if [ ! -d "/Applications/IronRise.app" ]; then
+          echo "❌ Install failed: App not found"
+          exit 1
+        fi
+        
+        echo "🗑️ Testing Uninstallation..."
+        ./uninstall.sh --no-prompt
+        
+        if [ -d "/Applications/IronRise.app" ]; then
+          echo "❌ Uninstall failed: App still exists"
+          exit 1
+        fi
+        echo "✅ Install/Uninstall verification passed!"
