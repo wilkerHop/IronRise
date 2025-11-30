@@ -16,41 +16,40 @@ fn build_wake_args(time: &DateTime<Local>) -> Vec<String> {
     vec!["repeat".to_string(), "wakeorpoweron".to_string(), time_str]
 }
 
-/// Schedules a system wake event.
-/// Note: This command requires root privileges.
-pub fn schedule_wake(time: DateTime<Local>) -> Result<(), PmsetError> {
-    let args = build_wake_args(&time);
+/// Executes a command with administrator privileges using AppleScript.
+fn execute_privileged(command: &str, args: &[String]) -> Result<(), PmsetError> {
+    // Construct the full shell command string
+    let full_command = format!("{} {}", command, args.join(" "));
 
-    // Command: sudo pmset repeat wakeorpoweron "MM/dd/yyyy HH:mm:ss"
-    let output = Command::new("sudo")
-        .arg("pmset")
-        .args(&args)
+    // AppleScript: do shell script "..." with administrator privileges
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(format!(
+            "do shell script \"{}\" with administrator privileges",
+            full_command
+        ))
         .output()
         .map_err(PmsetError::ExecutionFailed)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        // User cancelled auth usually returns "User canceled."
         return Err(PmsetError::CommandFailed(stderr.to_string()));
     }
 
     Ok(())
 }
 
+/// Schedules a system wake event.
+pub fn schedule_wake(time: DateTime<Local>) -> Result<(), PmsetError> {
+    let args = build_wake_args(&time);
+    execute_privileged("pmset", &args)
+}
+
 /// Clears any existing repeat schedule.
 pub fn clear_schedule() -> Result<(), PmsetError> {
-    let output = Command::new("sudo")
-        .arg("pmset")
-        .arg("repeat")
-        .arg("cancel")
-        .output()
-        .map_err(PmsetError::ExecutionFailed)?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(PmsetError::CommandFailed(stderr.to_string()));
-    }
-
-    Ok(())
+    let args = vec!["repeat".to_string(), "cancel".to_string()];
+    execute_privileged("pmset", &args)
 }
 
 #[cfg(test)]

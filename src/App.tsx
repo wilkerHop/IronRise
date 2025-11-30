@@ -1,17 +1,16 @@
-import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useState } from "react";
 import "./App.css";
 
 function App() {
   const [alarmTime, setAlarmTime] = useState("");
   const [status, setStatus] = useState("");
   const [filePath, setFilePath] = useState("/System/Library/Sounds/Glass.aiff");
+  const [isNightMode, setIsNightMode] = useState(false);
 
   async function scheduleAlarm() {
     try {
-      // Convert local time to ISO string for the backend
-      // We just take the input value (e.g. "2023-10-27T10:00") and append seconds/timezone if needed
-      // But input type="datetime-local" gives "YYYY-MM-DDTHH:mm"
       const date = new Date(alarmTime);
       await invoke("schedule_alarm", { isoTime: date.toISOString() });
       setStatus(`Alarm scheduled for ${date.toLocaleString()}`);
@@ -26,6 +25,17 @@ function App() {
       setStatus("Alarm cancelled");
     } catch (error) {
       setStatus(`Error: ${error}`);
+    }
+  }
+
+  async function selectFile() {
+    const file = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Audio", extensions: ["mp3", "wav", "aiff", "m4a"] }],
+    });
+    if (file) {
+      setFilePath(file as string);
     }
   }
 
@@ -47,6 +57,20 @@ function App() {
     }
   }
 
+  if (isNightMode) {
+    return (
+      <div
+        className="night-mode-overlay"
+        onDoubleClick={() => setIsNightMode(false)}
+      >
+        <div className="night-mode-content">
+          <h1>IronRise Active</h1>
+          <p>Double-click to wake</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="container">
       <h1>IronRise Alarm</h1>
@@ -66,16 +90,25 @@ function App() {
 
       <div className="card">
         <h2>2. Audio Settings</h2>
-        <input
-          type="text"
-          value={filePath}
-          onChange={(e) => setFilePath(e.target.value)}
-          placeholder="/path/to/sound.mp3"
-        />
+        <div className="row">
+          <input
+            type="text"
+            value={filePath}
+            readOnly
+            placeholder="No file selected"
+          />
+          <button onClick={selectFile}>Browse...</button>
+        </div>
         <div className="row">
           <button onClick={playTest}>Test Play (Max Vol)</button>
           <button onClick={stopAlarm}>Stop Audio</button>
         </div>
+      </div>
+
+      <div className="card">
+        <h2>3. Night Mode</h2>
+        <p>Turn screen black to prevent burn-in while keeping app active.</p>
+        <button onClick={() => setIsNightMode(true)}>Enter Night Mode</button>
       </div>
 
       <div className="status-bar">
@@ -87,7 +120,7 @@ function App() {
         <ul>
           <li><strong>Plug it in:</strong> Do not rely on battery power.</li>
           <li><strong>Leave Lid OPEN:</strong> The system will NOT wake if the lid is closed.</li>
-          <li><strong>Screen:</strong> You may dim the screen, but do not sleep the machine manually.</li>
+          <li><strong>Screen:</strong> Use Night Mode, do not sleep the machine manually.</li>
         </ul>
       </div>
     </main>

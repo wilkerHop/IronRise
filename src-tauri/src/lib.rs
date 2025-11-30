@@ -44,6 +44,7 @@ fn stop_alarm(state: State<AppState>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             player: Mutex::new(AlarmPlayer::new()),
         })
