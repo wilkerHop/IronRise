@@ -41,18 +41,19 @@ impl CommandExecutor for RealExecutor {
     }
 }
 
-/// Helper to build the pmset command arguments.
-fn build_wake_args(time: &DateTime<Local>) -> Vec<String> {
-    let time_str = time.format("%m/%d/%Y %H:%M:%S").to_string();
-    vec!["repeat".to_string(), "wakeorpoweron".to_string(), time_str]
-}
-
 /// Schedules a system wake event using the provided executor.
 pub fn schedule_wake_with<E: CommandExecutor>(
     executor: &E,
     time: DateTime<Local>,
 ) -> Result<(), PmsetError> {
-    let args = build_wake_args(&time);
+    // "schedule wakeorpoweron ..."
+    // To cancel: pmset schedule cancel wakeorpoweron "..."
+
+    // Let's adjust build_wake_args to handle the optional "cancel"
+    let mut args = vec!["schedule".to_string()];
+    args.push("wakeorpoweron".to_string());
+    args.push(time.format("%m/%d/%Y %H:%M:%S").to_string());
+
     executor.execute("pmset", &args)
 }
 
@@ -61,15 +62,24 @@ pub fn schedule_wake(time: DateTime<Local>) -> Result<(), PmsetError> {
     schedule_wake_with(&RealExecutor, time)
 }
 
-/// Clears any existing repeat schedule using the provided executor.
-pub fn clear_schedule_with<E: CommandExecutor>(executor: &E) -> Result<(), PmsetError> {
-    let args = vec!["repeat".to_string(), "cancel".to_string()];
+/// Cancels a specific scheduled wake event using the provided executor.
+pub fn cancel_wake_with<E: CommandExecutor>(
+    executor: &E,
+    time: DateTime<Local>,
+) -> Result<(), PmsetError> {
+    let time_str = time.format("%m/%d/%Y %H:%M:%S").to_string();
+    let args = vec![
+        "schedule".to_string(),
+        "cancel".to_string(),
+        "wakeorpoweron".to_string(),
+        time_str,
+    ];
     executor.execute("pmset", &args)
 }
 
-/// Clears any existing repeat schedule using the default RealExecutor.
-pub fn clear_schedule() -> Result<(), PmsetError> {
-    clear_schedule_with(&RealExecutor)
+/// Cancels a specific scheduled wake event using the default RealExecutor.
+pub fn cancel_wake(time: DateTime<Local>) -> Result<(), PmsetError> {
+    cancel_wake_with(&RealExecutor, time)
 }
 
 #[cfg(test)]
@@ -101,17 +111,6 @@ mod tests {
     }
 
     #[test]
-    fn test_build_wake_args() {
-        let time = Local.with_ymd_and_hms(2023, 10, 27, 10, 0, 0).unwrap();
-        let args = build_wake_args(&time);
-
-        assert_eq!(args.len(), 3);
-        assert_eq!(args[0], "repeat");
-        assert_eq!(args[1], "wakeorpoweron");
-        assert_eq!(args[2], "10/27/2023 10:00:00");
-    }
-
-    #[test]
     fn test_schedule_wake_use_case() {
         let mock = MockExecutor::new();
         let time = Local.with_ymd_and_hms(2024, 1, 1, 8, 30, 0).unwrap();
@@ -125,17 +124,18 @@ mod tests {
 
         let (cmd, args) = &commands[0];
         assert_eq!(cmd, "pmset");
-        assert_eq!(args[0], "repeat");
+        assert_eq!(args[0], "schedule");
         assert_eq!(args[1], "wakeorpoweron");
         assert_eq!(args[2], "01/01/2024 08:30:00");
     }
 
     #[test]
-    fn test_clear_schedule_use_case() {
+    fn test_cancel_wake_use_case() {
         let mock = MockExecutor::new();
+        let time = Local.with_ymd_and_hms(2024, 1, 1, 8, 30, 0).unwrap();
 
         // Execute the use case
-        clear_schedule_with(&mock).unwrap();
+        cancel_wake_with(&mock, time).unwrap();
 
         // Verify the interaction
         let commands = mock.executed_commands.borrow();
@@ -143,7 +143,9 @@ mod tests {
 
         let (cmd, args) = &commands[0];
         assert_eq!(cmd, "pmset");
-        assert_eq!(args[0], "repeat");
+        assert_eq!(args[0], "schedule");
         assert_eq!(args[1], "cancel");
+        assert_eq!(args[2], "wakeorpoweron");
+        assert_eq!(args[3], "01/01/2024 08:30:00");
     }
 }
